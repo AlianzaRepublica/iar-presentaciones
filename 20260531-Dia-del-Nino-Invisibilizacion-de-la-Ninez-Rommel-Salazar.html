@@ -1,0 +1,2008 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  Día del niño, invisibilización de la niñez
+  Presentación de sermón · Single Page Application autocontenida
+  ============================================================================
+
+  Predicación
+    Pasaje:     Mateo 18:1-5 · base: 1 Crónicas 28–29 (RV60)
+    Lugar:      Iglesia Alianza República
+    Fecha:      31 de mayo, 2026
+    Predicador: Pr. Rommel Salazar
+
+  Programa (SPA) creado por
+    Jonathan Ricardo Proaño Alcívar (Parlox)
+    Contacto:    jonathan@parlox.net · github.com/parlox
+    Asistencia:  Codificación asistida con IA Claude (Anthropic)
+    Disponible:  https://github.com/AlianzaRepublica
+
+  Skill generador
+    /sermon — generador de presentaciones homiléticas
+    Provisto por: Cafecito Teológico (ministerio)
+    Repositorio:  https://github.com/CafecitoTeologico/ct-skill-sermon
+    Licencia:     AGPL-3.0-or-later
+
+  Licencia del programa
+    AGPL-3.0-or-later (GNU Affero General Public License v3.0 o posterior)
+    https://www.gnu.org/licenses/agpl-3.0.html
+    Software libre. Si lo modificas o lo sirves a través de una red,
+    debes liberar el código fuente bajo la misma licencia.
+
+  Tecnología
+    HTML5 + CSS (container queries) + JavaScript vanilla
+    MQTT 3.1.1 sobre WebSocket Secure (cliente mínimo escrito a mano)
+    Broker: HiveMQ público (broker.hivemq.com:8884/mqtt)
+    Topic:  alianzarepublica/sermon/2026-05-31/lyhd3clm2k/control
+
+  Modos (vía query param)
+    ?mode=presentation  → vista personal, sin red (default)
+    ?mode=screen        → cabina, recibe el control
+    ?mode=control       → controla la presentación, ve notas/cronómetro
+    ?mode=print         → vista print-friendly + bloque info para PDF/papel
+    (sin parámetro)     → menú selector de modo
+
+  NOTA: La aplicación y la frase clave son PROPUESTA EDITORIAL asistida con IA,
+  pendiente de aprobación del Pr. Rommel Salazar. No son palabras del predicador.
+
+  Generado con el skill /sermon (v0.1.0).
+  ============================================================================
+-->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Día del niño, invisibilización de la niñez</title>
+<style>
+:root {
+  /* Paleta temática: kingdom (púrpura real + oro) */
+  --bg-dark-1: #150B1F;
+  --bg-dark-2: #221538;
+  --bg-dark-3: #1A0F2A;
+  --text-warm: #EFE6F4;
+  --text-warm-dim: #9A8AAB;
+  --accent-gold: #C9A14D;
+  --accent-gold-bright: #F5D898;
+  --accent-deep: #A8823A;
+  --bg-light-1: #F3EEF7;
+  --bg-light-2: #E6DCEE;
+  --text-dark: #241A2E;
+  --text-dark-dim: #564A63;
+  --accent-burgundy: #6B4A8F;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+  background: #000;
+  color: var(--text-warm);
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== STAGE & CANVAS ===== */
+.stage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  overflow: hidden;
+}
+
+.slide-canvas {
+  position: relative;
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
+  container-type: size;
+  container-name: canvas;
+  overflow: hidden;
+}
+
+.slide-canvas.mini {
+  width: 100%;
+  height: 100%;
+}
+
+/* ===== SLIDES ===== */
+.slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6cqh 8cqw;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 250ms ease;
+}
+.slide.active { opacity: 1; }
+
+.slide.theme-dark {
+  background:
+    radial-gradient(ellipse at 28% 18%, rgba(245, 216, 152, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 72% 88%, rgba(130, 80, 175, 0.14) 0%, transparent 55%),
+    linear-gradient(135deg, var(--bg-dark-1) 0%, var(--bg-dark-2) 55%, var(--bg-dark-3) 100%);
+  color: var(--text-warm);
+}
+.slide.theme-light {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(130, 80, 175, 0.18) 0%, transparent 65%),
+    linear-gradient(135deg, var(--bg-light-1) 0%, var(--bg-light-2) 100%);
+  color: var(--text-dark);
+}
+
+/* Cover */
+.cover-title {
+  font-weight: 900;
+  font-size: 7cqw;
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  max-width: 95%;
+  margin-bottom: 5cqh;
+}
+.cover-title .accent { color: var(--accent-gold); }
+.cover-church {
+  font-size: 2.6cqw;
+  font-weight: 500;
+  color: var(--text-warm-dim);
+  letter-spacing: 0.05em;
+  margin-bottom: 1.5cqh;
+}
+.cover-date {
+  font-size: 1.6cqw;
+  font-weight: 400;
+  color: var(--text-warm-dim);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.cover-speaker {
+  position: absolute;
+  bottom: 4cqh;
+  font-size: 1.05cqw;
+  color: var(--text-warm-dim);
+  opacity: 0.6;
+  letter-spacing: 0.05em;
+}
+
+/* Passage */
+.passage-ref {
+  font-weight: 800;
+  font-size: 10cqw;
+  letter-spacing: -0.02em;
+  color: var(--text-warm);
+  margin-bottom: 3cqh;
+  line-height: 1;
+}
+.passage-decor {
+  width: 8cqw;
+  height: 0.3cqh;
+  background: var(--accent-gold);
+  margin: 4cqh 0;
+  opacity: 0.7;
+  min-height: 2px;
+}
+.passage-note {
+  font-size: 1.9cqw;
+  color: var(--text-warm-dim);
+  font-style: italic;
+  max-width: 80cqw;
+  line-height: 1.4;
+}
+
+/* Hook */
+.hook-text {
+  font-weight: 800;
+  font-size: 6.5cqw;
+  line-height: 1.15;
+  max-width: 90%;
+  letter-spacing: -0.015em;
+}
+.hook-text .accent { color: var(--accent-gold); }
+
+/* Quote (epígrafe) */
+.quote-mark {
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  font-size: 13cqw;
+  color: var(--accent-gold);
+  line-height: 0.5;
+  opacity: 0.45;
+  margin-bottom: 1.5cqh;
+}
+.quote-text {
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 4.6cqw;
+  line-height: 1.35;
+  max-width: 86cqw;
+  color: var(--text-warm);
+}
+.quote-author {
+  font-size: 1.9cqw;
+  font-weight: 500;
+  color: var(--text-warm-dim);
+  letter-spacing: 0.1em;
+  margin-top: 4cqh;
+  text-transform: uppercase;
+}
+
+/* Transition */
+.transition-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4cqw;
+  flex-wrap: wrap;
+  max-width: 95%;
+}
+.transition-phrase {
+  font-weight: 700;
+  font-size: 4.5cqw;
+  line-height: 1.2;
+  flex: 1 1 35%;
+  min-width: 30cqw;
+}
+.transition-phrase.left {
+  color: var(--text-warm-dim);
+  text-align: right;
+  font-style: italic;
+}
+.transition-phrase.right {
+  color: var(--accent-gold-bright);
+  text-align: left;
+  font-weight: 800;
+}
+.transition-arrow {
+  font-size: 5cqw;
+  color: var(--accent-gold);
+  font-weight: 300;
+}
+
+/* Divider (kicker + título de sección) */
+.divider-kicker {
+  font-size: 2cqw;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent-gold);
+  margin-bottom: 3cqh;
+}
+.divider-title {
+  font-weight: 800;
+  font-size: 6cqw;
+  line-height: 1.1;
+  max-width: 88cqw;
+  letter-spacing: -0.015em;
+}
+.divider-decor {
+  width: 9cqw;
+  height: 0.3cqh;
+  min-height: 2px;
+  background: var(--accent-gold);
+  opacity: 0.6;
+  margin-top: 4cqh;
+}
+
+/* Point (clave numerada) */
+.point-number {
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  font-size: 13cqw;
+  font-weight: 700;
+  color: var(--accent-gold);
+  line-height: 0.85;
+  opacity: 0.92;
+  margin-bottom: 2cqh;
+}
+.point-title {
+  font-weight: 800;
+  font-size: 5.2cqw;
+  line-height: 1.12;
+  max-width: 86cqw;
+  letter-spacing: -0.015em;
+  margin-bottom: 2.2cqh;
+}
+.point-ref {
+  font-size: 1.9cqw;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--accent-gold-bright);
+  text-transform: uppercase;
+}
+.point-extra {
+  margin-top: 2.4cqh;
+  font-size: 2.2cqw;
+  color: var(--text-warm-dim);
+  font-style: italic;
+  line-height: 1.4;
+  max-width: 80cqw;
+}
+.heb {
+  font-family: 'Times New Roman', 'Frank Ruhl Libre', 'David', 'Noto Serif Hebrew', serif;
+  font-style: normal;
+  font-size: 1.15em;
+}
+
+/* Verse */
+.verse-ref {
+  font-size: 2cqw;
+  font-weight: 600;
+  color: var(--accent-burgundy);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 5cqh;
+}
+.verse-text {
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  font-size: 4cqw;
+  line-height: 1.4;
+  font-weight: 400;
+  max-width: 85cqw;
+  color: var(--text-dark);
+}
+.verse-text.emphasis {
+  font-size: 4.8cqw;
+  font-weight: 600;
+  font-style: italic;
+  line-height: 1.32;
+}
+.verse-decor {
+  width: 6cqw;
+  height: 2px;
+  background: var(--accent-burgundy);
+  margin-top: 5cqh;
+  opacity: 0.5;
+}
+
+/* Punch */
+.punch-line1 {
+  font-size: 4.5cqw;
+  font-weight: 500;
+  color: var(--text-warm-dim);
+  margin-bottom: 3cqh;
+  line-height: 1.2;
+}
+.punch-line2 {
+  font-size: 7cqw;
+  font-weight: 900;
+  color: var(--accent-gold-bright);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+/* Application — anchor (la una aplicación) */
+.appanchor-kicker {
+  font-size: 1.8cqw;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent-gold);
+  margin-bottom: 4cqh;
+}
+.appanchor-text {
+  font-weight: 900;
+  font-size: 7cqw;
+  line-height: 1.1;
+  max-width: 90cqw;
+  letter-spacing: -0.02em;
+}
+.appanchor-text .accent { color: var(--accent-gold-bright); }
+
+/* Application — step (expresión del eje) */
+.appstep-label {
+  font-size: 2.4cqw;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-gold);
+  margin-bottom: 3.2cqh;
+}
+.appstep-action {
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  font-weight: 500;
+  font-size: 5.6cqw;
+  line-height: 1.22;
+  max-width: 86cqw;
+  letter-spacing: -0.01em;
+  color: var(--text-warm);
+}
+
+/* Application — recap */
+.recap-decor {
+  width: 7cqw;
+  height: 2px;
+  background: var(--accent-gold);
+  opacity: 0.5;
+  margin-bottom: 4cqh;
+}
+.recap-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2.5cqw;
+  flex-wrap: wrap;
+  margin-bottom: 6cqh;
+}
+.recap-chip {
+  font-size: 3.2cqw;
+  font-weight: 700;
+  color: var(--accent-gold-bright);
+  letter-spacing: 0.02em;
+}
+.recap-sep {
+  font-size: 3.2cqw;
+  color: var(--accent-gold);
+  opacity: 0.55;
+  font-weight: 300;
+}
+.recap-phrase {
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 3.6cqw;
+  line-height: 1.32;
+  max-width: 84cqw;
+  color: var(--text-warm-dim);
+}
+
+/* Key phrase */
+.keyphrase-decor {
+  width: 8cqw;
+  height: 2px;
+  background: var(--accent-burgundy);
+  margin-bottom: 5cqh;
+  opacity: 0.6;
+}
+.keyphrase-text {
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  font-size: 5cqw;
+  line-height: 1.3;
+  font-weight: 500;
+  font-style: italic;
+  max-width: 90cqw;
+  color: var(--text-dark);
+}
+.keyphrase-text em { font-style: italic; color: var(--accent-burgundy); font-weight: 600; }
+
+/* Blackout */
+.blackout {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+.blackout.on {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ===== PULPIT VIEW ===== */
+.control {
+  display: none;
+  position: fixed;
+  inset: 0;
+  flex-direction: column;
+  background: #15151A;
+  color: #E5E5E5;
+  font-size: 14px;
+  overflow: hidden;
+}
+body.mode-control { background: #15151A; overflow: hidden; }
+body.mode-control .control { display: flex; }
+body.mode-control .stage { display: none; }
+body.mode-control .blackout { display: none; }
+
+.control-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: #0F0F12;
+  border-bottom: 1px solid #2A2A30;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.control-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #999;
+}
+.status-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #555;
+  transition: background 200ms;
+  flex-shrink: 0;
+}
+.status-dot.connected { background: #4ADE80; box-shadow: 0 0 8px #4ADE80; }
+.status-dot.connecting { background: #FBBF24; box-shadow: 0 0 8px #FBBF24; animation: pulse 1.5s infinite; }
+.status-dot.disconnected { background: #EF4444; box-shadow: 0 0 8px #EF4444; }
+.status-dot.disabled { background: #555; }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.control-timer {
+  font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #4ADE80;
+  transition: color 300ms;
+}
+.control-timer.good { color: #4ADE80; }   /* 0:00 – 30:00 */
+.control-timer.warn { color: #FB923C; }   /* 30:01 – 35:00 */
+.control-timer.danger { color: #EF4444; } /* 35:01 → ∞ */
+.control-timer.paused { opacity: 0.4; }
+
+.control-counter {
+  font-size: 14px;
+  color: #999;
+  font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
+}
+.control-counter strong { color: #FFF; font-size: 17px; }
+
+.control-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  grid-template-rows: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.preview-cell {
+  background: #0F0F12;
+  border-radius: 8px;
+  border: 1px solid #2A2A30;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.preview-cell.current { grid-column: 1; grid-row: 1; }
+.preview-cell.next { grid-column: 2; grid-row: 1; }
+
+.preview-label {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  font-size: 10.5px;
+  color: #FFF;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  z-index: 5;
+  background: rgba(0,0,0,0.55);
+  padding: 4px 9px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.preview-frame {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.preview-empty {
+  color: #555;
+  font-style: italic;
+  font-size: 14px;
+}
+
+.control-notes {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  background: #0F0F12;
+  border-radius: 8px;
+  border: 1px solid #2A2A30;
+  padding: 14px 20px;
+  overflow-y: auto;
+}
+.notes-label {
+  font-size: 10.5px;
+  color: #888;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.notes-content {
+  white-space: pre-wrap;
+  font-size: 16px;
+  line-height: 1.55;
+  color: #DDD;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+}
+
+.control-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #0F0F12;
+  border-top: 1px solid #2A2A30;
+  flex-wrap: wrap;
+}
+.btn {
+  background: #2A2A35;
+  color: #E5E5E5;
+  border: 1px solid #3A3A45;
+  border-radius: 6px;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms;
+  font-family: inherit;
+}
+.btn:hover { background: #3A3A45; border-color: #4A4A55; }
+.btn:active { transform: scale(0.97); }
+.btn.primary { background: #2563EB; border-color: #3B82F6; }
+.btn.primary:hover { background: #3B82F6; }
+.btn.danger { background: #7F1D1D; border-color: #991B1B; }
+.btn.danger:hover { background: #991B1B; }
+.btn.danger.active {
+  background: #DC2626;
+  border-color: #EF4444;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
+}
+.btn.small { padding: 9px 14px; font-size: 13px; }
+
+.help-hint {
+  position: fixed;
+  bottom: 8px;
+  left: 16px;
+  font-size: 11px;
+  color: #555;
+  font-family: 'SF Mono', Menlo, monospace;
+  pointer-events: none;
+}
+
+@media (max-width: 900px) {
+  .control-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 0.6fr 1fr;
+  }
+  .preview-cell.current { grid-column: 1; grid-row: 1; }
+  .preview-cell.next { grid-column: 1; grid-row: 2; }
+  .control-notes { grid-column: 1; grid-row: 3; }
+  .control-header { font-size: 12px; padding: 8px 12px; }
+  .control-timer { font-size: 20px; }
+  .btn { padding: 10px 14px; font-size: 13px; }
+  .btn.small { padding: 8px 10px; font-size: 12px; }
+  .help-hint { display: none; }
+}
+
+/* Presentation hint */
+.standalone-hint {
+  position: fixed;
+  bottom: 10px;
+  right: 14px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.18);
+  font-family: 'SF Mono', Menlo, monospace;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Screen-mode discreet status dot */
+.screen-status-dot {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #555;
+  z-index: 100;
+  opacity: 0.55;
+  transition: background 200ms, box-shadow 200ms;
+  display: none;
+}
+body.mode-screen .screen-status-dot { display: block; }
+.screen-status-dot.connected { background: #4ADE80; box-shadow: 0 0 5px rgba(74, 222, 128, 0.6); }
+.screen-status-dot.connecting { background: #FBBF24; box-shadow: 0 0 5px rgba(251, 191, 36, 0.6); animation: pulse 1.5s infinite; }
+.screen-status-dot.disconnected { background: #EF4444; box-shadow: 0 0 5px rgba(239, 68, 68, 0.6); }
+
+/* ===== MODE SELECTOR ===== */
+.selector {
+  display: none;
+  position: fixed;
+  inset: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse at 28% 18%, rgba(245, 216, 152, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 72% 88%, rgba(130, 80, 175, 0.14) 0%, transparent 55%),
+    linear-gradient(135deg, var(--bg-dark-1) 0%, var(--bg-dark-2) 55%, var(--bg-dark-3) 100%);
+  color: var(--text-warm);
+  padding: 5vh 5vw;
+  text-align: center;
+  z-index: 200;
+  overflow: auto;
+}
+body.mode-select .selector { display: flex; }
+body.mode-select .stage,
+body.mode-select .control,
+body.mode-select .blackout,
+body.mode-select .standalone-hint { display: none; }
+
+.selector-title {
+  font-size: clamp(1.6rem, 3.5vw, 2.8rem);
+  font-weight: 800;
+  margin-bottom: 1vh;
+  letter-spacing: -0.01em;
+  max-width: 90vw;
+  line-height: 1.15;
+}
+.selector-title .accent { color: var(--accent-gold); }
+.selector-sub {
+  font-size: clamp(0.9rem, 1.5vw, 1.1rem);
+  color: var(--text-warm-dim);
+  margin-bottom: 5vh;
+  letter-spacing: 0.05em;
+}
+.selector-options {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  max-width: 460px;
+}
+.opt {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(201, 161, 77, 0.28);
+  color: var(--text-warm);
+  border-radius: 10px;
+  padding: 22px 24px;
+  font-family: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  transition: all 180ms;
+}
+.opt:hover {
+  background: rgba(201, 161, 77, 0.10);
+  border-color: var(--accent-gold);
+  transform: translateY(-1px);
+}
+.opt:active { transform: translateY(0); }
+.opt-icon {
+  font-size: 1.8rem;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(201, 161, 77, 0.14);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.opt-body { flex: 1; min-width: 0; }
+.opt-name {
+  font-weight: 700;
+  font-size: 1.15rem;
+  margin-bottom: 3px;
+  letter-spacing: -0.005em;
+}
+.opt-desc {
+  font-size: 0.88rem;
+  color: var(--text-warm-dim);
+  line-height: 1.35;
+}
+.opt.primary { border-color: var(--accent-gold); background: rgba(201, 161, 77, 0.08); }
+.opt.primary .opt-icon { background: rgba(201, 161, 77, 0.24); }
+
+.selector-footer {
+  margin-top: 4vh;
+  font-size: 0.75rem;
+  color: var(--text-warm-dim);
+  opacity: 0.5;
+  max-width: 460px;
+  line-height: 1.5;
+}
+.selector-credits {
+  margin-top: 3vh;
+  padding-top: 2vh;
+  border-top: 1px solid rgba(201, 161, 77, 0.12);
+  font-size: 0.7rem;
+  color: var(--text-warm-dim);
+  opacity: 0.5;
+  max-width: 460px;
+  line-height: 1.7;
+  text-align: center;
+}
+.selector-credits a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+}
+.selector-credits a:hover {
+  color: var(--accent-gold);
+  opacity: 1;
+}
+.selector-credits .sep {
+  opacity: 0.4;
+  margin: 0 6px;
+}
+.selector-credits .skill-attribution {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.62rem;
+  opacity: 0.65;
+}
+
+/* ===== PRINT MODE ===== */
+.print-view { display: none; }
+body.mode-print {
+  background: #f5f5f5; color: #1a1a1a; overflow: auto; min-height: 100vh;
+}
+body.mode-print .selector,
+body.mode-print .stage,
+body.mode-print .control,
+body.mode-print .blackout,
+body.mode-print .standalone-hint,
+body.mode-print .screen-status-dot { display: none !important; }
+body.mode-print .print-view { display: block; }
+
+.print-toolbar {
+  position: sticky; top: 0; z-index: 100;
+  background: white; padding: 14px 24px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+}
+.print-toolbar .pt-title { font-size: 14px; font-weight: 600; color: #444; }
+.print-toolbar button {
+  background: #1a1a1a; color: white; border: 0;
+  border-radius: 6px; padding: 9px 18px;
+  font: inherit; font-weight: 600; font-size: 13px; cursor: pointer;
+}
+.print-toolbar button:hover { background: #333; }
+
+.print-pages { padding: 30px 24px; max-width: 980px; margin: 0 auto; }
+.print-slide {
+  background: white; border: 1px solid #e0e0e0; border-radius: 8px;
+  padding: 50px 60px; margin-bottom: 24px;
+  min-height: 60vh;
+  display: flex; flex-direction: column; justify-content: center;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  position: relative;
+}
+.print-slide-meta {
+  position: absolute; top: 14px; left: 24px; right: 24px;
+  display: flex; justify-content: space-between;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 10px; color: #aaa;
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.print-slide h1.cover { font-size: 32pt; line-height: 1.15; color: #1a1a1a; margin-bottom: 18px; }
+.print-slide .cover-meta { font-size: 12pt; color: #666; line-height: 1.6; font-family: -apple-system, sans-serif; }
+.print-slide h2.section-num { font-size: 14pt; color: #888; text-transform: uppercase; letter-spacing: 0.12em; font-family: -apple-system, sans-serif; margin-bottom: 8px; }
+.print-slide h2.section-title { font-size: 26pt; line-height: 1.2; color: #1a1a1a; margin-bottom: 12px; }
+.print-slide .punch-text,
+.print-slide .hook-text,
+.print-slide .key-phrase-text { font-size: 22pt; line-height: 1.4; color: #2a2a2a; font-style: italic; }
+.print-slide .key-phrase-text { color: #1a1a1a; font-weight: 600; font-style: normal; }
+.print-slide .verse-ref { font-size: 11pt; color: #888; font-family: -apple-system, sans-serif; margin-bottom: 14px; letter-spacing: 0.05em; }
+.print-slide blockquote.verse-text {
+  font-size: 16pt; line-height: 1.6; color: #2a2a2a;
+  padding-left: 22px; border-left: 3px solid #6B4A8F;
+  font-style: italic; margin: 0;
+}
+.print-slide .verse-emphasis { color: #5E3A7E; font-weight: 600; font-style: normal; }
+.print-slide .action-num { font-size: 14pt; color: #888; font-family: -apple-system, sans-serif; margin-bottom: 8px; }
+.print-slide .action-title { font-size: 22pt; line-height: 1.3; color: #1a1a1a; margin-bottom: 10px; }
+.print-slide .action-subtitle { font-size: 14pt; line-height: 1.5; color: #555; }
+.print-slide.theme-light { background: #fdfcf9; }
+.print-slide em { font-style: italic; color: #5E3A7E; }
+.print-slide .heb { font-family: 'Times New Roman', 'Frank Ruhl Libre', serif; }
+
+.print-license-block {
+  background: white; border: 1px solid #e0e0e0; border-radius: 8px;
+  padding: 20px 30px; margin-top: 24px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+  font-size: 10pt; color: #555;
+}
+.print-license-block h2 { font-size: 12pt; margin-bottom: 12px; color: #2a2a2a; font-weight: 600; letter-spacing: 0.02em; }
+.print-license-block table { width: 100%; margin-bottom: 14px; border-collapse: collapse; }
+.print-license-block th { text-align: left; font-weight: 500; color: #888; padding: 3px 12px 3px 0; width: 95px; vertical-align: top; font-size: 9pt; }
+.print-license-block td { padding: 3px 0; color: #2a2a2a; font-size: 10pt; }
+.print-license-block .attribution,
+.print-license-block .license { font-size: 9pt; color: #666; line-height: 1.55; margin-bottom: 8px; }
+.print-license-block a { color: #444; }
+
+@media print {
+  html, body {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+  body.mode-print {
+    background: white !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+  .print-toolbar { display: none !important; }
+  .print-pages { padding: 0; max-width: none; }
+  .print-slide {
+    border: none; margin-bottom: 0; box-shadow: none;
+    page-break-after: always; page-break-inside: avoid;
+    min-height: auto; height: 100vh; padding: 30mm 25mm;
+  }
+  .print-license-block {
+    border: none; box-shadow: none;
+    page-break-before: auto;
+    padding: 18mm 22mm;
+    margin-top: 0;
+  }
+}
+
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage"></div>
+<div class="blackout" id="blackout"></div>
+<div class="screen-status-dot" id="screenStatusDot" title="Estado MQTT"></div>
+
+<div class="selector" id="selector">
+  <div class="selector-title">Día del niño,<br><span class="accent">invisibilización de la niñez</span></div>
+  <div class="selector-sub">Iglesia Alianza República · 31 de mayo, 2026 · Pr. Rommel Salazar</div>
+
+  <div class="selector-options">
+    <button class="opt primary" data-mode="presentation">
+      <div class="opt-icon">👤</div>
+      <div class="opt-body">
+        <div class="opt-name">Ver presentación</div>
+        <div class="opt-desc">Para verla por tu cuenta · navega con flechas o haciendo clic</div>
+      </div>
+    </button>
+    <button class="opt" data-mode="screen">
+      <div class="opt-icon">📺</div>
+      <div class="opt-body">
+        <div class="opt-name">Cabina · pantalla</div>
+        <div class="opt-desc">Recibe el control desde el púlpito y proyecta</div>
+      </div>
+    </button>
+    <button class="opt" data-mode="control">
+      <div class="opt-icon">🎛</div>
+      <div class="opt-body">
+        <div class="opt-name">Modo control · predicador</div>
+        <div class="opt-desc">Vista del predicador con notas, cronómetro y controles</div>
+      </div>
+    </button>
+    <button class="opt" data-mode="print">
+      <div class="opt-icon">📄</div>
+      <div class="opt-body">
+        <div class="opt-name">Imprimir · guardar PDF</div>
+        <div class="opt-desc">Vista lineal de todas las láminas + ficha informativa para imprimir o exportar PDF</div>
+      </div>
+    </button>
+  </div>
+
+  <div class="selector-footer">
+    Si no sabes cuál escoger, presiona "Ver presentación".
+  </div>
+
+  <div class="selector-credits">
+    Programa (SPA) creado por Jonathan Ricardo Proaño Alcívar
+    en base al bosquejo de Pr. Rommel Salazar.<br>
+    Asistido con IA Claude (Anthropic) ·
+    <a href="mailto:jonathan@parlox.net">jonathan@parlox.net</a><br>
+    Disponible en
+    <a href="https://github.com/AlianzaRepublica" target="_blank" rel="noopener">github.com/AlianzaRepublica</a>
+    <span class="sep">·</span>
+    Licenciado bajo
+    <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener">AGPL-3.0-or-later</a>
+    — software libre con código abierto al servirse en red.
+    <span class="skill-attribution">
+      Generado con el skill
+      <a href="https://github.com/CafecitoTeologico/ct-skill-sermon" target="_blank" rel="noopener">/sermon</a>
+      provisto por Cafecito Teológico.
+    </span>
+  </div>
+</div>
+
+<div class="print-view" id="printView">
+  <div class="print-toolbar">
+    <div class="pt-title">Día del niño, invisibilización de la niñez — Vista de impresión</div>
+    <button id="btnPrint" type="button">Imprimir / Guardar PDF</button>
+  </div>
+  <div class="print-pages" id="printPages"></div>
+</div>
+
+<div class="control" id="control">
+  <div class="control-header">
+    <div class="control-status">
+      <span class="status-dot disabled" id="statusDot"></span>
+      <span id="statusText">Inicializando…</span>
+    </div>
+    <div class="control-timer" id="timer">00:00</div>
+    <div class="control-counter">Lámina <strong id="counterCurrent">1</strong> / <span id="counterTotal">24</span></div>
+  </div>
+
+  <div class="control-body">
+    <div class="preview-cell current">
+      <div class="preview-label">Actual</div>
+      <div class="preview-frame" id="previewCurrent"></div>
+    </div>
+    <div class="preview-cell next">
+      <div class="preview-label">Siguiente</div>
+      <div class="preview-frame" id="previewNext"></div>
+    </div>
+    <div class="control-notes">
+      <div class="notes-label">Bosquejo · esta lámina</div>
+      <div class="notes-content" id="notesContent"></div>
+    </div>
+  </div>
+
+  <div class="control-controls">
+    <button class="btn small" id="btnTimerToggle">⏸ Pausar</button>
+    <button class="btn small" id="btnTimerReset">↻ Reset</button>
+    <button class="btn" id="btnPrev">← Anterior</button>
+    <button class="btn danger" id="btnBlackout">Pantalla negra (B)</button>
+    <button class="btn primary" id="btnNext">Siguiente →</button>
+    <button class="btn small" id="btnResync">⟲ Resync</button>
+  </div>
+
+  <div class="help-hint">← → o espacio: navegar  ·  B: blackout  ·  Esc: salir blackout  ·  Home/End: primera/última</div>
+</div>
+
+<div class="standalone-hint" id="standaloneHint"></div>
+
+<script>
+'use strict';
+
+// ============== MINI MQTT 3.1.1 over WebSocket (QoS 0) ==============
+class MiniMQTT {
+  constructor(url, options) {
+    options = options || {};
+    this.url = url;
+    this.clientId = options.clientId || ('c-' + Math.random().toString(36).slice(2, 12));
+    this.keepalive = options.keepalive || 60;
+    this.handlers = { connect: [], message: [], close: [], error: [] };
+    this.subs = new Set();
+    this.ws = null;
+    this.pingInterval = null;
+    this.reconnectTimer = null;
+    this.reconnectDelay = 2000;
+    this.shouldReconnect = true;
+    this._connected = false;
+  }
+  on(e, h) { (this.handlers[e] = this.handlers[e] || []).push(h); }
+  emit(e) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    (this.handlers[e] || []).forEach(function(h) { try { h.apply(null, args); } catch(_){} });
+  }
+  connect() { this.shouldReconnect = true; this._open(); }
+  end() {
+    this.shouldReconnect = false;
+    if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
+    this._cleanup();
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      try { this.ws.send(new Uint8Array([0xE0, 0x00])); } catch(_){}
+      this.ws.close();
+    }
+  }
+  _open() {
+    var self = this;
+    try {
+      this.ws = new WebSocket(this.url, ['mqtt']);
+      this.ws.binaryType = 'arraybuffer';
+    } catch (e) {
+      this.emit('error', e);
+      this._scheduleReconnect();
+      return;
+    }
+    this.ws.onopen = function() { self._sendConnect(); };
+    this.ws.onmessage = function(e) { self._onMessage(new Uint8Array(e.data)); };
+    this.ws.onclose = function() {
+      self._connected = false;
+      self._cleanup();
+      self.emit('close');
+      if (self.shouldReconnect) self._scheduleReconnect();
+    };
+    this.ws.onerror = function(e) { self.emit('error', e); };
+  }
+  _scheduleReconnect() {
+    var self = this;
+    if (this.reconnectTimer) return;
+    var delay = Math.min(this.reconnectDelay, 15000);
+    this.reconnectTimer = setTimeout(function() {
+      self.reconnectTimer = null;
+      self._open();
+    }, delay);
+    this.reconnectDelay = Math.min(Math.floor(this.reconnectDelay * 1.5), 15000);
+  }
+  _cleanup() {
+    if (this.pingInterval) { clearInterval(this.pingInterval); this.pingInterval = null; }
+  }
+  _encLen(len) {
+    var out = [];
+    do { var b = len % 128; len = Math.floor(len / 128); if (len > 0) b |= 0x80; out.push(b); } while (len > 0);
+    return out;
+  }
+  _encStr(s) {
+    var b = new TextEncoder().encode(s);
+    var out = new Array(b.length + 2);
+    out[0] = (b.length >> 8) & 0xFF; out[1] = b.length & 0xFF;
+    for (var i = 0; i < b.length; i++) out[i + 2] = b[i];
+    return out;
+  }
+  _sendConnect() {
+    var proto = this._encStr('MQTT');
+    var cid = this._encStr(this.clientId);
+    var vh = proto.concat([4, 0x02, (this.keepalive >> 8) & 0xFF, this.keepalive & 0xFF]);
+    var rem = vh.length + cid.length;
+    var fh = [0x10].concat(this._encLen(rem));
+    this.ws.send(new Uint8Array(fh.concat(vh, cid)));
+  }
+  subscribe(topic) {
+    this.subs.add(topic);
+    if (this._connected) this._sendSub(topic);
+  }
+  _sendSub(topic) {
+    var pid = Math.floor(Math.random() * 65534) + 1;
+    var vh = [(pid >> 8) & 0xFF, pid & 0xFF];
+    var tb = this._encStr(topic);
+    var payload = tb.concat([0x00]);
+    var rem = vh.length + payload.length;
+    var fh = [0x82].concat(this._encLen(rem));
+    this.ws.send(new Uint8Array(fh.concat(vh, payload)));
+  }
+  publish(topic, msg) {
+    if (!this._connected || !this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
+    var tb = this._encStr(topic);
+    var pb = typeof msg === 'string' ? new TextEncoder().encode(msg) : msg;
+    var rem = tb.length + pb.length;
+    var fh = [0x30].concat(this._encLen(rem));
+    var packet = new Uint8Array(fh.length + tb.length + pb.length);
+    packet.set(fh, 0);
+    packet.set(tb, fh.length);
+    packet.set(pb, fh.length + tb.length);
+    try { this.ws.send(packet); return true; } catch (e) { return false; }
+  }
+  _onMessage(data) {
+    var off = 0;
+    while (off < data.length) {
+      var type = data[off] >> 4;
+      var flags = data[off] & 0x0F;
+      off++;
+      var rem = 0, mult = 1, byte;
+      do {
+        if (off >= data.length) return;
+        byte = data[off++];
+        rem += (byte & 0x7F) * mult;
+        mult *= 128;
+      } while ((byte & 0x80) !== 0);
+      var end = off + rem;
+
+      if (type === 2) { // CONNACK
+        var rc = data[off + 1];
+        if (rc === 0) {
+          this._connected = true;
+          this.reconnectDelay = 2000;
+          var self = this;
+          this.subs.forEach(function(t) { self._sendSub(t); });
+          this.pingInterval = setInterval(function() {
+            if (self.ws && self.ws.readyState === WebSocket.OPEN) {
+              try { self.ws.send(new Uint8Array([0xC0, 0x00])); } catch(_){}
+            }
+          }, this.keepalive * 800);
+          this.emit('connect');
+        } else {
+          this.emit('error', new Error('CONNACK rc=' + rc));
+        }
+      } else if (type === 3) { // PUBLISH
+        var tlen = (data[off] << 8) | data[off + 1];
+        var topic = new TextDecoder().decode(data.slice(off + 2, off + 2 + tlen));
+        var qos = (flags >> 1) & 0x03;
+        var pStart = off + 2 + tlen;
+        if (qos > 0) pStart += 2;
+        var payload = new TextDecoder().decode(data.slice(pStart, end));
+        this.emit('message', topic, payload);
+      }
+      off = end;
+    }
+  }
+}
+
+// ============== CONFIG ==============
+const TOPIC = 'alianzarepublica/sermon/2026-05-31/lyhd3clm2k/control';
+const BROKER_URL = 'wss://broker.hivemq.com:8884/mqtt';
+const TARGET_MINUTES = 35;
+// Cronómetro: umbrales en segundos según política del skill /sermon
+const TIMER_GREEN_UNTIL_SECS = 30 * 60;  // 0:00 → 30:00 verde
+const TIMER_ORANGE_UNTIL_SECS = 35 * 60; // 30:01 → 35:00 anaranjado
+                                          // 35:01 → ∞ rojo
+
+// ============== SLIDES ==============
+const SLIDES = [
+  {
+    type: 'cover',
+    theme: 'dark',
+    title: 'Día del niño,<br><span class="accent">invisibilización de la niñez</span>',
+    church: 'Iglesia Alianza República',
+    date: '31 de mayo, 2026',
+    speaker: 'Pr. Rommel Salazar',
+    notes: '— Saludo y bienvenida · Día del niño\n— Oración inicial\n— Anuncio del tema\n\nTextos: Mateo 18:1-5 (marco) · 1 Crónicas 28–29 (base expositiva)'
+  },
+  {
+    type: 'passage',
+    theme: 'dark',
+    reference: 'Mateo 18:1-5',
+    note: 'Texto base del mensaje: 1 Crónicas 28–29 · RV60',
+    notes: '— Lectura de Mateo 18:1-5 (RV60)\n— Los discípulos preguntan: ¿quién es el mayor en el reino del cielo?\n— Jesús pone a un niño en medio de ellos\n— El niño, lo pequeño, es el centro de la respuesta del Reino'
+  },
+  {
+    type: 'hook',
+    theme: 'dark',
+    text: '¿En qué momento dejamos de <span class="accent">ver</span> al niño?',
+    notes: 'HOOK — invisibilización de la niñez\n\n— El niño que está, pero no se ve\n— La niñez reducida a futuro ("cuando sea grande"), nunca presente\n— Esclavitud, abandono, vulneración, maltrato (muchas veces de su propia familia)\n— Hoy, Día del niño, nos confronta: ¿lo vemos?'
+  },
+  {
+    type: 'quote',
+    theme: 'dark',
+    text: 'Una cultura adulta que, al reprimir la infancia, acaba condenándose a la inmadurez.',
+    author: 'Giorgio Agamben',
+    notes: 'EPÍGRAFE — Agamben (25 de abril de 2026)\n\n— El pesimismo de Occidente nace de hacer de Adán un ser privado de infancia\n— Reprimir la infancia → una adultez que no madura\n— La cura: "devolver a Adán su infancia"\n— Conexión: el Reino se entra volviéndose como niño (Mt 18:3)'
+  },
+  {
+    type: 'transition',
+    theme: 'dark',
+    left: 'El mundo invisibiliza al niño',
+    right: 'Dios lo reconoce',
+    notes: '— Donde el mundo no ve, Dios ve\n— Donde el mundo reduce, Dios reconoce y nombra\n— Puente: si Jesús pone al niño en el centro (Mt 18), ¿cómo formamos a ese niño?\n— Vamos a 1 Crónicas 28–29: David y Salomón'
+  },
+  {
+    type: 'verse',
+    theme: 'light',
+    reference: 'Mateo 18:3 · RV60',
+    text: 'De cierto os digo, que si no os volvéis y os hacéis como niños, no entraréis en el reino de los cielos.',
+    notes: '— Hacerse como niño: humildad, dependencia, pequeñez\n— No es infantilismo; es recibir el Reino como un don, no conquistarlo\n— El niño es el modelo del ciudadano del Reino'
+  },
+  {
+    type: 'verse',
+    theme: 'light',
+    reference: 'Mateo 18:5 · RV60',
+    text: 'Y cualquiera que reciba en mi nombre a un niño como este, a mí me recibe.',
+    emphasis: true,
+    notes: '⭐ CLAVE ⭐\n\n— Recibir al niño = recibir a Cristo\n— El niño invisibilizado es el lugar donde se encuentra a Jesús\n— Pasamos del "ver" al "recibir y formar": ¿cómo?\n— Transición a las seis claves de 1 Crónicas 28–29'
+  },
+  {
+    type: 'divider',
+    theme: 'dark',
+    kicker: '1 Crónicas 28–29',
+    title: 'Seis claves para criar desde la niñez',
+    notes: 'CUERPO — base expositiva\n\n— David instruye a Salomón y a todo Israel para edificar el templo\n— Del modelo de David extraemos 6 claves para educar a nuestros hijos desde su niñez\n— Avanzar clave por clave'
+  },
+  {
+    type: 'point',
+    theme: 'dark',
+    number: '1',
+    title: 'Reconocer la niñez y su fragilidad',
+    reference: '1 Crónicas 29:1',
+    extra: 'náar (<span class="heb">נַעַר</span>) · rac (<span class="heb">רַךְ</span>) — tierno y débil',
+    notes: 'CLAVE 1 — 1 Cr 29:1\n\n— David dice: "Salomón… es joven (náar) y tierno/débil (rac), y la obra es grande"\n— náar = niño/joven; rac = blando, tierno, frágil\n— Reconocer la edad del niño, su fragilidad, su debilidad y sus necesidades\n— Punto de partida: ver al niño como niño, no como adulto en miniatura'
+  },
+  {
+    type: 'point',
+    theme: 'dark',
+    number: '2',
+    title: 'Rodearse de los mejores',
+    reference: '1 Crónicas 28:1-2',
+    notes: 'CLAVE 2 — 1 Cr 28:1-2\n\n— David reúne a todos los líderes, jefes y valientes de Israel\n— Rodea la obra (y a su hijo) de lo mejor\n— A los niños los formamos rodeándolos de lo mejor: ejemplos, comunidad, maestros, recursos\n— La crianza no es tarea solitaria'
+  },
+  {
+    type: 'point',
+    theme: 'dark',
+    number: '3',
+    title: 'Guiarlos a conocer al Hijo de Dios',
+    reference: '1 Crónicas 28:9 · Efesios 4:13',
+    notes: 'CLAVE 3 — 1 Cr 28:9; Ef 4:13\n\n— "Reconoce al Dios de tu padre y sírvele de todo corazón" (28:9)\n— Meta: la madurez, "la plena medida de la estatura de Cristo" (Ef 4:13)\n— Formar es, ante todo, guiar al niño al conocimiento de Cristo\n— Conocimiento que es relación, no solo información'
+  },
+  {
+    type: 'point',
+    theme: 'dark',
+    number: '4',
+    title: 'Encargarlos y empoderarlos',
+    reference: '1 Crónicas 28:10-13',
+    notes: 'CLAVE 4 — 1 Cr 28:10-13\n\n— "Mira pues, porque Jehová te ha elegido… esfuérzate y manos a la obra"\n— David encarga a Salomón la edificación del templo y le entrega los diseños\n— Empoderar: darle al niño tarea real, responsabilidad, confianza\n— No sobreproteger hasta la inutilidad'
+  },
+  {
+    type: 'point',
+    theme: 'dark',
+    number: '5',
+    title: 'Provisión',
+    reference: '1 Crónicas 28:14-19',
+    notes: 'CLAVE 5 — 1 Cr 28:14-19\n\n— David provee oro, plata, materiales y el diseño detallado de todo\n— Provee lo necesario para que la obra se realice\n— Proveer al niño lo que necesita para crecer y servir: tiempo, recursos, herramientas, dirección'
+  },
+  {
+    type: 'point',
+    theme: 'dark',
+    number: '6',
+    title: 'Confianza en Dios y responsabilidad',
+    reference: '1 Crónicas 28:20-21',
+    notes: 'CLAVE 6 — 1 Cr 28:20-21\n\n— "Esfuérzate y sé valiente, y manos a la obra; no temas… porque Jehová Dios, mi Dios, estará contigo"\n— Confiar en Dios + despertar en el niño sentido de responsabilidad\n— Soltar al niño en las manos de Dios, sin abandonarlo'
+  },
+  {
+    type: 'transition',
+    theme: 'dark',
+    left: 'Lo hacemos todo por el niño',
+    right: 'pero todo procede de Dios',
+    notes: 'TRANSICIÓN A LA CONCLUSIÓN\n\n— Reconocer, rodear, guiar, encargar, proveer, confiar…\n— Y al final, David no se atribuye nada: lo entrega todo a Dios\n— La doxología (1 Cr 29:11-13): toda grandeza y provisión vienen de Dios\n— También el niño es don de Dios'
+  },
+  {
+    type: 'verse',
+    theme: 'light',
+    reference: '1 Crónicas 29:11 · RV60',
+    text: 'Tuya es, oh Jehová, la magnificencia y el poder, la gloria, la victoria y el honor; porque todas las cosas que están en los cielos y en la tierra son tuyas. Tuyo, oh Jehová, es el reino, y tú eres excelso sobre todos.',
+    notes: 'CONCLUSIÓN — doxología de David (1/2)\n\n— Todo es de Dios; el reino es suyo\n— David reconoce que la obra, los recursos y el futuro no son logro humano'
+  },
+  {
+    type: 'verse',
+    theme: 'light',
+    reference: '1 Crónicas 29:12-13 · RV60',
+    text: 'Las riquezas y la gloria proceden de ti, y tú dominas sobre todo; en tu mano está la fuerza y el poder. Ahora pues, Dios nuestro, nosotros alabamos y loamos tu glorioso nombre.',
+    emphasis: true,
+    notes: 'CONCLUSIÓN — doxología de David (2/2)\n\n— De Dios procede todo; en sus manos está hacer grande\n— Cerramos: el niño, su formación y su futuro están en las manos del Dios que gobierna todo\n— PAUSA — dejar asentar'
+  },
+  {
+    type: 'punch',
+    theme: 'dark',
+    line1: 'El mundo invisibiliza al niño.',
+    line2: 'Dios lo reconoce, lo forma y lo envía.',
+    notes: '⚡ PUNCH de la conclusión ⚡\n\n— Eco de la frase clave\n— Mirar a la congregación\n— Transición a la aplicación: "Esta semana…"'
+  },
+  {
+    type: 'application-anchor',
+    theme: 'dark',
+    kicker: 'Una aplicación · esta semana',
+    text: 'Reconoce al <span class="accent">niño</span> que has dejado de ver.',
+    notes: 'APLICACIÓN — (PROPUESTA EDITORIAL, pendiente de aprobación del Pr. Rommel Salazar)\n\nUna sola aplicación memorable: dejar de invisibilizar.\nTres movimientos: Reconocer · Formar · Confiar.\n\n¿Qué niño —en tu casa, tu iglesia, tu entorno— necesitas volver a ver esta semana?'
+  },
+  {
+    type: 'application-step',
+    theme: 'dark',
+    label: 'Reconocer',
+    action: 'Ve la fragilidad de un niño y rodéalo de lo mejor.',
+    notes: 'EXPRESIÓN 1 (claves 1-2)\n\n— Reconocer la niñez (náar) y su fragilidad (rac), sus necesidades\n— Rodearlo de los mejores: ejemplo, comunidad, recursos\n— Acción: nombra a ese niño; decide acompañarlo'
+  },
+  {
+    type: 'application-step',
+    theme: 'dark',
+    label: 'Formar',
+    action: 'Guíalo a conocer al Hijo de Dios; encárgale y provéele.',
+    notes: 'EXPRESIÓN 2 (claves 3-5)\n\n— Guiar al conocimiento de Cristo (Ef 4:13)\n— Encargar y empoderar: darle tarea y confianza\n— Proveer lo necesario para crecer y servir\n— Forma su corazón, no solo corrijas su conducta'
+  },
+  {
+    type: 'application-step',
+    theme: 'dark',
+    label: 'Confiar',
+    action: 'Entrégalo a Dios y despierta en él responsabilidad.',
+    notes: 'EXPRESIÓN 3 (clave 6)\n\n— Confianza en Dios + sentido de responsabilidad\n— Soltarlo en las manos del que gobierna todo (1 Cr 29:11-12)\n— Confiar no es abandonar: es entregar a Dios lo que más amas'
+  },
+  {
+    type: 'application-recap',
+    theme: 'dark',
+    labels: ['Reconocer', 'Formar', 'Confiar'],
+    phrase: 'Tres movimientos de una sola obra: que ningún niño sea invisible para nosotros, como no lo es para Dios.',
+    notes: 'RECAP de la aplicación\n\n— Reconocer · Formar · Confiar\n— Una sola obra de crianza, sostenida por Dios\n— Transición a la frase clave de cierre'
+  },
+  {
+    type: 'key-phrase',
+    theme: 'light',
+    text: 'Donde el mundo invisibiliza la niñez,<br>Dios <em>reconoce, forma y envía</em>.',
+    notes: '🔑 FRASE CLAVE DEL SERMÓN 🔑\n(PROPUESTA EDITORIAL, pendiente de aprobación del Pr. Rommel Salazar)\n\n— Pausa larga\n— Oración final\n— Bendición'
+  }
+];
+
+// ============== STATE ==============
+const params = new URLSearchParams(window.location.search);
+const mode = params.get('mode') || 'select';
+const CLIENT_ID = 'sermon-' + mode + '-' + Math.random().toString(36).slice(2, 8);
+
+let state = {
+  slide: 0,
+  blackout: false,
+  ts: 0
+};
+
+let mqtt = null;
+let stageCanvas = null;
+let suppressPublish = false;
+
+// ============== RENDER ==============
+function renderSlide(s) {
+  const el = document.createElement('div');
+  el.className = 'slide theme-' + s.theme;
+  let html = '';
+  switch (s.type) {
+    case 'cover':
+      html = `
+        <h1 class="cover-title">${s.title}</h1>
+        <div class="cover-church">${s.church}</div>
+        <div class="cover-date">${s.date}</div>
+        <div class="cover-speaker">${s.speaker}</div>
+      `;
+      break;
+    case 'passage':
+      html = `
+        <div class="passage-ref">${s.reference}</div>
+        <div class="passage-decor"></div>
+        <div class="passage-note">${s.note}</div>
+      `;
+      break;
+    case 'hook':
+      html = `<div class="hook-text">${s.text}</div>`;
+      break;
+    case 'quote':
+      html = `
+        <div class="quote-mark">“</div>
+        <div class="quote-text">${s.text}</div>
+        <div class="quote-author">${s.author}</div>
+      `;
+      break;
+    case 'transition':
+      html = `
+        <div class="transition-wrap">
+          <div class="transition-phrase left">${s.left}</div>
+          <div class="transition-arrow">→</div>
+          <div class="transition-phrase right">${s.right}</div>
+        </div>
+      `;
+      break;
+    case 'divider':
+      html = `
+        <div class="divider-kicker">${s.kicker}</div>
+        <div class="divider-title">${s.title}</div>
+        <div class="divider-decor"></div>
+      `;
+      break;
+    case 'point':
+      html = `
+        <div class="point-number">${s.number}</div>
+        <div class="point-title">${s.title}</div>
+        <div class="point-ref">${s.reference}</div>
+        ${s.extra ? `<div class="point-extra">${s.extra}</div>` : ''}
+      `;
+      break;
+    case 'verse':
+      html = `
+        <div class="verse-ref">${s.reference}</div>
+        <div class="verse-text${s.emphasis ? ' emphasis' : ''}">${s.text}</div>
+        <div class="verse-decor"></div>
+      `;
+      break;
+    case 'punch':
+      html = `
+        <div class="punch-line1">${s.line1}</div>
+        <div class="punch-line2">${s.line2}</div>
+      `;
+      break;
+    case 'application-anchor':
+      html = `
+        <div class="appanchor-kicker">${s.kicker || 'Una aplicación'}</div>
+        <div class="appanchor-text">${s.text}</div>
+      `;
+      break;
+    case 'application-step':
+      html = `
+        <div class="appstep-label">${s.label}</div>
+        <div class="appstep-action">${s.action}</div>
+      `;
+      break;
+    case 'application-recap':
+      html = `
+        <div class="recap-decor"></div>
+        <div class="recap-row">${s.labels.map((l, i) => `<span class="recap-chip">${l}</span>${i < s.labels.length - 1 ? '<span class="recap-sep">·</span>' : ''}`).join('')}</div>
+        <div class="recap-phrase">${s.phrase}</div>
+      `;
+      break;
+    case 'key-phrase':
+      html = `
+        <div class="keyphrase-decor"></div>
+        <div class="keyphrase-text">${s.text}</div>
+      `;
+      break;
+  }
+  el.innerHTML = html;
+  return el;
+}
+
+function ensureCanvas() {
+  if (!stageCanvas) {
+    const stage = document.getElementById('stage');
+    stage.innerHTML = '';
+    stageCanvas = document.createElement('div');
+    stageCanvas.className = 'slide-canvas';
+    stage.appendChild(stageCanvas);
+  }
+  return stageCanvas;
+}
+
+function showSlide(idx, withTransition) {
+  const canvas = ensureCanvas();
+  const data = SLIDES[idx];
+  if (!data) return;
+  const next = renderSlide(data);
+
+  if (withTransition === false) {
+    canvas.innerHTML = '';
+    next.classList.add('active');
+    canvas.appendChild(next);
+    return;
+  }
+
+  const old = canvas.querySelector('.slide.active');
+  canvas.appendChild(next);
+  void next.offsetHeight;
+  next.classList.add('active');
+  if (old) {
+    old.classList.remove('active');
+    setTimeout(() => { if (old.parentNode) old.parentNode.removeChild(old); }, 280);
+  }
+}
+
+function renderPreview(container, idx) {
+  const existing = container.querySelector('.slide-canvas');
+  if (existing) existing.remove();
+  const empty = container.querySelector('.preview-empty');
+  if (empty) empty.remove();
+
+  if (idx == null || idx < 0 || idx >= SLIDES.length) {
+    const e = document.createElement('div');
+    e.className = 'preview-empty';
+    e.textContent = '— Última lámina —';
+    container.appendChild(e);
+    return;
+  }
+
+  const canvas = document.createElement('div');
+  canvas.className = 'slide-canvas mini';
+  const slide = renderSlide(SLIDES[idx]);
+  slide.classList.add('active');
+  canvas.appendChild(slide);
+  container.appendChild(canvas);
+}
+
+// ============== MQTT INTEGRATION ==============
+function setStatus(cls, text) {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  if (dot) dot.className = 'status-dot ' + cls;
+  if (txt) txt.textContent = text;
+  const screenDot = document.getElementById('screenStatusDot');
+  if (screenDot) screenDot.className = 'screen-status-dot ' + cls;
+}
+
+function publishState() {
+  if (!mqtt || suppressPublish) return;
+  mqtt.publish(TOPIC, JSON.stringify({
+    type: 'state',
+    slide: state.slide,
+    blackout: state.blackout,
+    src: CLIENT_ID,
+    ts: state.ts
+  }));
+}
+
+function applyState(newState) {
+  const slideChanged = newState.slide !== state.slide;
+  state.slide = Math.max(0, Math.min(SLIDES.length - 1, newState.slide || 0));
+  state.blackout = !!newState.blackout;
+  state.ts = newState.ts || Date.now();
+  applyToView(slideChanged);
+}
+
+function applyToView(slideChanged) {
+  if (mode === 'control') {
+    updatePulpit();
+  } else {
+    showSlide(state.slide, slideChanged !== false);
+    const bo = document.getElementById('blackout');
+    if (bo) bo.classList.toggle('on', state.blackout);
+  }
+}
+
+function changeSlide(delta) {
+  const newIdx = Math.max(0, Math.min(SLIDES.length - 1, state.slide + delta));
+  if (newIdx !== state.slide) {
+    state.slide = newIdx;
+    state.ts = Date.now();
+    applyToView(true);
+    publishState();
+  }
+}
+
+function gotoSlide(idx) {
+  idx = Math.max(0, Math.min(SLIDES.length - 1, idx));
+  if (idx !== state.slide) {
+    state.slide = idx;
+    state.ts = Date.now();
+    applyToView(true);
+    publishState();
+  }
+}
+
+function toggleBlackout() {
+  state.blackout = !state.blackout;
+  state.ts = Date.now();
+  applyToView(false);
+  publishState();
+}
+
+// ============== PULPIT ==============
+function updatePulpit() {
+  const cur = state.slide;
+  const total = SLIDES.length;
+  document.getElementById('counterCurrent').textContent = cur + 1;
+  document.getElementById('counterTotal').textContent = total;
+
+  renderPreview(document.getElementById('previewCurrent'), cur);
+  renderPreview(document.getElementById('previewNext'), cur + 1 < total ? cur + 1 : null);
+
+  document.getElementById('notesContent').textContent = SLIDES[cur].notes || '';
+
+  const bb = document.getElementById('btnBlackout');
+  bb.classList.toggle('active', state.blackout);
+  bb.textContent = state.blackout ? 'Restaurar pantalla (B)' : 'Pantalla negra (B)';
+}
+
+// ============== TIMER ==============
+let timerStart = null;
+let timerPaused = 0;
+let timerPauseAt = null;
+let timerInterval = null;
+
+function startTimer() {
+  if (!timerStart) timerStart = Date.now();
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(updateTimer, 500);
+  updateTimer();
+}
+
+function updateTimer() {
+  const el = document.getElementById('timer');
+  if (!el || !timerStart) return;
+  const elapsed = Math.floor((Date.now() - timerStart - timerPaused) / 1000);
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  el.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  el.classList.remove('good', 'warn', 'danger');
+  if (elapsed > TIMER_ORANGE_UNTIL_SECS) el.classList.add('danger');
+  else if (elapsed > TIMER_GREEN_UNTIL_SECS) el.classList.add('warn');
+  else el.classList.add('good');
+}
+
+// ============== INIT MQTT ==============
+function initMQTT() {
+  setStatus('connecting', 'Conectando al broker…');
+  mqtt = new MiniMQTT(BROKER_URL, { clientId: CLIENT_ID, keepalive: 60 });
+
+  mqtt.on('connect', () => {
+    setStatus('connected', 'Conectado · ' + (mode === 'control' ? 'control' : 'pantalla'));
+    mqtt.subscribe(TOPIC);
+    setTimeout(() => {
+      mqtt.publish(TOPIC, JSON.stringify({ type: 'sync', src: CLIENT_ID, ts: Date.now() }));
+      publishState();
+    }, 250);
+  });
+
+  mqtt.on('close', () => setStatus('disconnected', 'Desconectado · reintentando…'));
+  mqtt.on('error', () => setStatus('disconnected', 'Error · reintentando…'));
+
+  mqtt.on('message', (topic, payload) => {
+    try {
+      const msg = JSON.parse(payload);
+      if (msg.src === CLIENT_ID) return;
+      if (msg.type === 'state') {
+        if (msg.ts > state.ts) {
+          applyState(msg);
+        }
+      } else if (msg.type === 'sync') {
+        publishState();
+      }
+    } catch (_) {}
+  });
+
+  mqtt.connect();
+}
+
+// ============== KEYBOARD ==============
+document.addEventListener('keydown', (e) => {
+  if (mode === 'preview') return;
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+
+  switch (e.key) {
+    case 'ArrowRight':
+    case 'PageDown':
+    case ' ':
+      e.preventDefault();
+      changeSlide(1);
+      break;
+    case 'ArrowLeft':
+    case 'PageUp':
+      e.preventDefault();
+      changeSlide(-1);
+      break;
+    case 'Home':
+      e.preventDefault();
+      gotoSlide(0);
+      break;
+    case 'End':
+      e.preventDefault();
+      gotoSlide(SLIDES.length - 1);
+      break;
+    case 'b':
+    case 'B':
+      e.preventDefault();
+      toggleBlackout();
+      break;
+    case 'Escape':
+      if (state.blackout) {
+        e.preventDefault();
+        toggleBlackout();
+      } else if (document.fullscreenElement) {
+        document.exitFullscreen();
+      }
+      break;
+    case 'f':
+    case 'F':
+      e.preventDefault();
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+      break;
+  }
+});
+
+// Click navigation in screen/presentation
+function attachClickNav() {
+  document.getElementById('stage').addEventListener('click', (e) => {
+    const w = window.innerWidth;
+    if (e.clientX > w / 2) changeSlide(1);
+    else changeSlide(-1);
+  });
+}
+
+// ============== INIT ==============
+function wireSelector() {
+  const buttons = document.querySelectorAll('.opt[data-mode]');
+  buttons.forEach(b => {
+    b.addEventListener('click', () => {
+      const target = b.getAttribute('data-mode');
+      const url = new URL(window.location.href);
+      url.searchParams.set('mode', target);
+      window.location.href = url.toString();
+    });
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.body.classList.add('mode-' + mode);
+
+  if (mode === 'select') {
+    wireSelector();
+    return;
+  }
+
+  if (mode === 'control') {
+    document.getElementById('counterTotal').textContent = SLIDES.length;
+    updatePulpit();
+    startTimer();
+
+    document.getElementById('btnPrev').onclick = () => changeSlide(-1);
+    document.getElementById('btnNext').onclick = () => changeSlide(1);
+    document.getElementById('btnBlackout').onclick = () => toggleBlackout();
+
+    document.getElementById('btnTimerToggle').onclick = function(e) {
+      const btn = e.currentTarget;
+      const tEl = document.getElementById('timer');
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        tEl.classList.add('paused');
+        btn.textContent = '▶ Reanudar';
+        timerPauseAt = Date.now();
+      } else {
+        if (timerPauseAt) timerPaused += Date.now() - timerPauseAt;
+        timerPauseAt = null;
+        startTimer();
+        tEl.classList.remove('paused');
+        btn.textContent = '⏸ Pausar';
+      }
+    };
+
+    document.getElementById('btnTimerReset').onclick = () => {
+      timerStart = Date.now();
+      timerPaused = 0;
+      timerPauseAt = null;
+      const tEl = document.getElementById('timer');
+      tEl.classList.remove('paused');
+      document.getElementById('btnTimerToggle').textContent = '⏸ Pausar';
+      if (!timerInterval) startTimer();
+      else updateTimer();
+    };
+
+    document.getElementById('btnResync').onclick = () => {
+      if (mqtt) {
+        mqtt.publish(TOPIC, JSON.stringify({ type: 'sync', src: CLIENT_ID, ts: Date.now() }));
+        setTimeout(publishState, 100);
+      }
+    };
+
+    initMQTT();
+
+  } else if (mode === 'screen') {
+    showSlide(0, false);
+    attachClickNav();
+    initMQTT();
+
+  } else if (mode === 'preview') {
+    const idx = parseInt(params.get('slide') || '0', 10);
+    state.slide = idx;
+    showSlide(idx, false);
+    document.body.style.cursor = 'none';
+
+  } else if (mode === 'print') {
+    renderPrintMode();
+
+  } else {
+    // presentation (default)
+    showSlide(0, false);
+    attachClickNav();
+    const hint = document.getElementById('standaloneHint');
+    if (hint) hint.textContent = '← →  ·  espacio  ·  B (negro)  ·  F (pantalla completa)';
+  }
+});
+
+// ============== PRINT MODE ==============
+const PRINT_META = {
+  title:     'Día del niño, invisibilización de la niñez',
+  passage:   'Mateo 18:1-5 · 1 Crónicas 28–29 (RV60)',
+  preacher:  'Pr. Rommel Salazar',
+  at:        'Iglesia Alianza República',
+  date:      '31 de mayo, 2026',
+  org_url:   'https://github.com/AlianzaRepublica',
+  org_label: 'github.com/AlianzaRepublica'
+};
+
+function renderPrintMode() {
+  const pages = document.getElementById('printPages');
+  if (!pages) return;
+
+  SLIDES.forEach((s, idx) => {
+    const el = document.createElement('article');
+    el.className = 'print-slide theme-' + (s.theme || 'dark');
+    let body = '';
+
+    switch (s.type) {
+      case 'cover':
+        body = `<h1 class="cover">${s.title || ''}</h1>
+                <div class="cover-meta">
+                  ${s.church ? '<div>' + s.church + '</div>' : ''}
+                  ${s.date ? '<div>' + s.date + '</div>' : ''}
+                  ${s.speaker ? '<div style="margin-top:14px;font-size:10pt;color:#888">' + s.speaker + '</div>' : ''}
+                </div>`;
+        break;
+      case 'hook':
+        body = `<p class="hook-text">${s.text || ''}</p>`;
+        break;
+      case 'quote':
+        body = `<blockquote class="verse-text">${s.text || ''}</blockquote>
+                <p class="verse-ref" style="margin-top:14px">— ${s.author || ''}</p>`;
+        break;
+      case 'punch':
+        body = `<p class="punch-text">${(s.line1 || '') + ' ' + (s.line2 || '')}</p>`;
+        break;
+      case 'transition':
+        body = `<p class="hook-text">${s.left || ''}<br><br>${s.right || ''}</p>`;
+        break;
+      case 'key-phrase':
+        body = `<p class="key-phrase-text">${s.text || ''}</p>`;
+        break;
+      case 'divider':
+        body = `<h2 class="section-num">${s.kicker || ''}</h2>
+                <h2 class="section-title">${s.title || ''}</h2>`;
+        break;
+      case 'verse':
+      case 'passage':
+        body = `<div class="verse-ref">${s.reference || ''}</div>
+                <blockquote class="verse-text">${s.text || s.note || ''}</blockquote>`;
+        break;
+      case 'point':
+        body = `<div class="action-num">Clave ${s.number || ''} · ${s.reference || ''}</div>
+                <h2 class="action-title">${s.title || ''}</h2>
+                ${s.extra ? '<p class="action-subtitle">' + s.extra + '</p>' : ''}`;
+        break;
+      case 'application-anchor':
+        body = `<div class="action-num">${s.kicker || 'Aplicación'}</div>
+                <h2 class="action-title">${s.text || ''}</h2>`;
+        break;
+      case 'application-step':
+        body = `<div class="action-num">Aplicación · ${s.label || ''}</div>
+                <h2 class="action-title">${s.action || ''}</h2>`;
+        break;
+      case 'application-recap':
+        body = `<div class="action-num">Síntesis de la aplicación</div>
+                <h2 class="action-title">${(s.labels || []).join(' · ')}</h2>
+                <p class="action-subtitle">${s.phrase || ''}</p>`;
+        break;
+      default:
+        body = `<p style="font-family:monospace;font-size:10pt;color:#888">${s.type} — ${(s.title || s.text || s.notes || '').toString().slice(0, 200)}</p>`;
+    }
+
+    el.innerHTML = `
+      <div class="print-slide-meta">
+        <span>${s.type}</span>
+        <span>Lámina ${idx + 1} de ${SLIDES.length}</span>
+      </div>
+      ${body}
+    `;
+    pages.appendChild(el);
+  });
+
+  const info = document.createElement('section');
+  info.className = 'print-license-block';
+  info.innerHTML = `
+    <h2>Información de la presentación</h2>
+    <table>
+      <tbody>
+        <tr><th>Sermón</th>     <td>${PRINT_META.title}</td></tr>
+        <tr><th>Pasaje</th>     <td>${PRINT_META.passage}</td></tr>
+        <tr><th>Predicador</th> <td>${PRINT_META.preacher}</td></tr>
+        <tr><th>Lugar</th>      <td>${PRINT_META.at}</td></tr>
+        <tr><th>Fecha</th>      <td>${PRINT_META.date}</td></tr>
+      </tbody>
+    </table>
+    <p class="attribution">
+      Programa (SPA) creado por <strong>Jonathan Ricardo Proaño Alcívar</strong>
+      en base al bosquejo de <strong>${PRINT_META.preacher}</strong>,
+      con asistencia de IA Claude (Anthropic).
+      Disponible en <a href="${PRINT_META.org_url}">${PRINT_META.org_label}</a>.
+      Generado con el skill <a href="https://github.com/CafecitoTeologico/ct-skill-sermon">/sermon</a>
+      provisto por Cafecito Teológico.
+    </p>
+    <p class="attribution" style="font-style:italic">
+      Nota: la sección de aplicación y la frase clave son propuesta editorial asistida con IA,
+      pendiente de aprobación del predicador. No son palabras del Pr. Rommel Salazar.
+    </p>
+    <p class="license">
+      <strong>Licencia:</strong> AGPL-3.0-or-later
+      (<a href="https://www.gnu.org/licenses/agpl-3.0.html">texto completo</a>).
+      Software libre. Se permite su uso, modificación y redistribución bajo los términos
+      de la GNU Affero General Public License versión 3 o posterior. Si se sirve a través
+      de una red, su código fuente debe estar disponible para los usuarios bajo la misma licencia.
+    </p>
+  `;
+  pages.appendChild(info);
+
+  const btnPrint = document.getElementById('btnPrint');
+  if (btnPrint) btnPrint.onclick = () => window.print();
+}
+</script>
+</body>
+</html>
